@@ -13,6 +13,7 @@ class DataProcessor:
     __bars_max_groups = 15
     __graphs_size = (16, 8)
     __bars_rot_threshold = 0.67
+    __clear_stat = {}
 
     def __init__(
         self,
@@ -51,6 +52,14 @@ class DataProcessor:
     def log_deleted_rows_size(self, df: pd.DataFrame):
         self.__log_clear_info(self.saved_df_shape[0], df.shape[0], ": итоги очистки")
 
+    def get_deleted_rows_size(self, df: pd.DataFrame):
+        return self.saved_df_shape[0] - df.shape[0]
+
+    def get_deleted_rows_procent(self, df: pd.DataFrame):
+        return round(
+            (self.saved_df_shape[0] - df.shape[0]) / self.saved_df_shape[0] * 100, 2
+        )
+
     def set_bars_max_groups(self, max_groups):
         self.__bars_max_groups = max_groups
 
@@ -59,6 +68,12 @@ class DataProcessor:
 
     def set_bars_rot_treshold(self, treshold: float):
         self.__bars_rot_threshold = treshold
+
+    def get_clear_stat(self, column: str):
+        return self.__clear_stat[column]
+
+    def get_is_converted_tenge_to_rub(self):
+        return self.__is_convert_tenge_to_rub
 
     # Метод предобработки для конвертации курса валют в рубли
     def convert_kzt_to_rub(
@@ -81,10 +96,13 @@ class DataProcessor:
             f"Количество строк без пропусков нового столбца: {df['revenue_rub'].count()}"
         )
         print(f"Количество пропусков нового столбца: {df['revenue_rub'].isna().sum()}")
+
         return df
 
     # Метод предобработки для очистки выбросов в столбце revenue_rub
-    def clear_outliers_in_revenue_rub(self, df: pd.DataFrame) -> pd.DataFrame:
+    def clear_outliers_in_revenue_rub(
+        self, df: pd.DataFrame, saved_clear_key="outliers_revenue_rub"
+    ) -> pd.DataFrame:
         # Копируем датафрейм, чтобы не было побочных эффектов из-за ссылок
         df = df.copy()
 
@@ -95,11 +113,14 @@ class DataProcessor:
         self.__log_clear_info(
             count_rows_before_filters, df.shape[0], "выбросов в столбце revenue_rub"
         )
+        self.__save_clear_info(count_rows_before_filters, df.shape[0], saved_clear_key)
 
         return df
 
     # Метод предобработки для очистки полных дубликатов
-    def clear_complete_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
+    def clear_complete_duplicates(
+        self, df: pd.DataFrame, saved_clear_key="complete_duplicates"
+    ) -> pd.DataFrame:
         # Копируем датафрейм, чтобы не было побочных эффектов из-за ссылок
         df = df.copy()
 
@@ -128,11 +149,14 @@ class DataProcessor:
         self.__log_clear_info(
             count_rows_before_filters, df.shape[0], "полных дубликатов, кроме order_id"
         )
+        self.__save_clear_info(count_rows_before_filters, df.shape[0], saved_clear_key)
 
         return df
 
     # Метод предобработки для очистки отрицательных значений в столбце revenue
-    def clear_negative_revenue(self, df: pd.DataFrame) -> pd.DataFrame:
+    def clear_negative_revenue(
+        self, df: pd.DataFrame, saved_clear_key="negative_revenue"
+    ) -> pd.DataFrame:
         # Копируем датафрейм, чтобы не было побочных эффектов из-за ссылок
         df = df.copy()
 
@@ -145,6 +169,7 @@ class DataProcessor:
             df.shape[0],
             "отрицательных значений в столбце revenue",
         )
+        self.__save_clear_info(count_rows_before_filters, df.shape[0], saved_clear_key)
 
         return df
 
@@ -223,11 +248,13 @@ class DataProcessor:
         return profiles_df
 
     # Метод предобработки для очистки выбросов в столбце count_orders профилей пользователей
-    def clear_outliers_in_count_orders(self, profiles_df: pd.DataFrame) -> pd.DataFrame:
+    def clear_outliers_in_count_orders(
+        self, profiles_df: pd.DataFrame, saved_clear_key="outliers_count_orders"
+    ) -> pd.DataFrame:
         # Копируем датафрейм, чтобы не было побочных эффектов из-за ссылок
         profiles_df = profiles_df.copy()
 
-        old_count_rows = profiles_df.shape[0]
+        count_rows_before_filters = profiles_df.shape[0]
 
         # Очистка данных по 99 процентилю количества заказов
 
@@ -236,9 +263,12 @@ class DataProcessor:
         ]
 
         self.__log_clear_info(
-            old_count_rows,
+            count_rows_before_filters,
             profiles_df.shape[0],
             "выбросов в столбце count_orders профилей пользователей",
+        )
+        self.__save_clear_info(
+            count_rows_before_filters, profiles_df.shape[0], saved_clear_key
         )
 
         return profiles_df
@@ -247,7 +277,7 @@ class DataProcessor:
     def show_profiles_first_event_type_main_stat(
         self, profiles_df: pd.DataFrame
     ) -> None:
-        self.__first_steps_profiles_stat(
+        unique_users_per_first_step = self.__first_steps_profiles_stat(
             profiles_df,
             "first_event_type_main",
             "Количество пользователей в первом мероприятии",
@@ -257,9 +287,11 @@ class DataProcessor:
 
         plt.show()
 
+        return unique_users_per_first_step
+
     # Метод для показа статистики первых шагов профилей пользователей по типу первого устройства
     def show_profiles_first_device_type_stat(self, profiles_df: pd.DataFrame) -> None:
-        self.__first_steps_profiles_stat(
+        unique_users_per_first_step = self.__first_steps_profiles_stat(
             profiles_df,
             "first_order_device_type",
             "Количество пользователей в первом устройстве",
@@ -268,9 +300,11 @@ class DataProcessor:
         )
         plt.show()
 
+        return unique_users_per_first_step
+
     # Метод для показа статистики первых шагов профилей пользователей по региону первого мероприятия
     def show_profiles_first_region_name_stat(self, profiles_df: pd.DataFrame) -> None:
-        self.__first_steps_profiles_stat(
+        unique_users_per_first_step = self.__first_steps_profiles_stat(
             profiles_df,
             "first_order_region_name",
             "Количество пользователей в первом регионе",
@@ -279,33 +313,41 @@ class DataProcessor:
         )
         plt.show()
 
+        return unique_users_per_first_step
+
     # Метод для показа статистики профилей пользователей с двумя заказами и более по типу первого мероприятия
     def show_profiles_with_two_orders_by_first_event_type_main(
         self, profiles_df: pd.DataFrame
     ) -> None:
-        self.__profiles_stat_per_segment_with_two_orders(
+        grouped_segment = self.__profiles_stat_per_segment_with_two_orders(
             profiles_df,
             "first_event_type_main",
         )
         plt.show()
 
+        return grouped_segment
+
     # Метод для показа статистики профилей пользователей с двумя заказами и более по типу первого устройства
     def show_profiles_with_two_orders_by_first_device_type(
         self, profiles_df: pd.DataFrame
     ) -> None:
-        self.__profiles_stat_per_segment_with_two_orders(
+        grouped_segment = self.__profiles_stat_per_segment_with_two_orders(
             profiles_df, "first_order_device_type", color="lime"
         )
         plt.show()
+
+        return grouped_segment
 
     # Метод для показа статистики профилей пользователей с двумя заказами и более по региону первого мероприятия
     def show_profiles_with_two_orders_by_first_region_name(
         self, profiles_df: pd.DataFrame
     ) -> None:
-        self.__profiles_stat_per_segment_with_two_orders(
+        grouped_segment = self.__profiles_stat_per_segment_with_two_orders(
             profiles_df, "first_order_region_name", color="pink"
         )
         plt.show()
+
+        return grouped_segment
 
     # Метод для проверки первой гипотезы
     def show_first_hypothesis(self, profiles_df: pd.DataFrame) -> None:
@@ -333,6 +375,8 @@ class DataProcessor:
 
         plt.show()
 
+        return first_sports_concerts_users_types
+
     # Метод для проверки второй гипотезы
     def show_second_hypothesis(self, profiles_df: pd.DataFrame) -> None:
         top_regions_stat = (
@@ -353,12 +397,13 @@ class DataProcessor:
         print("=== Доля вернувшихся пользователей ===")
         print(top_regions_stat)
 
-        pd.concat(
+        result_regions = pd.concat(
             [
                 top_regions_stat[: self.__bars_max_groups],
                 top_regions_stat[-(self.__bars_max_groups) :],
             ]
-        ).plot(
+        )
+        result_regions.plot(
             kind="barh",
             title="Процент вернувшихся пользователей в топ регионах по сравнению с количеством пользователей",
             xlabel="Регион",
@@ -368,6 +413,8 @@ class DataProcessor:
         )
 
         plt.show()
+
+        return result_regions
 
     # Метод для показа разницы в средней выручке между профилями с одним заказом и с двумя и более
     def show_diff_avg_revenue_between_profiles_types(
@@ -430,6 +477,8 @@ class DataProcessor:
         )
 
         plt.show()
+
+        return first_day_users_stat
 
     # Метод для показа матрицы корреляции между признаками профилей пользователей с количеством заказов
     def matrix_correlation_by_orders_count(
@@ -513,6 +562,21 @@ class DataProcessor:
         )
         print()
 
+    def __save_clear_info(
+        self, count_rows_before_filters: int, count_rows_after_filters: int, column: str
+    ) -> None:
+        self.__clear_stat[column] = {
+            "count": count_rows_before_filters - count_rows_after_filters,
+            "procent": round(
+                (count_rows_before_filters - count_rows_after_filters)
+                / count_rows_before_filters
+                * 100,
+                2,
+            ),
+            "count_before": count_rows_before_filters,
+            "count_after": count_rows_after_filters,
+        }
+
     # Внутренний метод для конвертации рублей в тенге
     def __rub_to_tenge(self, row: pd.Series) -> float:
         currency_code = row["currency_code"]
@@ -561,6 +625,8 @@ class DataProcessor:
             rot=self.__bars_rot(unique_users_per_first_step),
         )
 
+        return unique_users_per_first_step
+
     def __profiles_stat_per_segment_with_two_orders(
         self,
         profiles_df: pd.DataFrame,
@@ -592,6 +658,8 @@ class DataProcessor:
             color=color,
             edgecolor="black",
         )
+
+        return grouped_segment
 
     # Внутренний метод для конвертации дня недели в строку
     def __day_of_week_to_str(self, day: int) -> str:
