@@ -2,6 +2,12 @@
 
 # Проект анализа лояльности пользователей яндекс афиши
 
+## Ссылка на github
+
+```
+https://github.com/isaev-andrew-ds/mle-analiz-loyalnosti-polzovatelej
+```
+
 ## Запуск
 
 1. В github нажмите `clone` -> `ssh`/`https` *(любой из них)* -> скопируйте `url` *(кнопка копирования)*
